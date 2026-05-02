@@ -26,6 +26,8 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setError('');
+    // We update loading state AFTER triggering the popup in some cases to avoid blocker,
+    // but here we'll keep it for UI feedback and just handle the error better.
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -44,7 +46,15 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Google Sign-In failed');
+      if (err.code === 'auth/popup-blocked') {
+        setError('The sign-in popup was blocked by your browser. Please enable popups for this site and try again.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in window was closed. Please try again.');
+      } else if (err.message && err.message.includes('Cross-Origin-Opener-Policy')) {
+        setError('Security policy blocked the login. This often happens in preview mode. Click the "Open in new tab" icon at the top right to log in securely.');
+      } else {
+        setError(err.message || 'Google Sign-In failed');
+      }
     } finally {
       setLoading(false);
     }

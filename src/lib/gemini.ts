@@ -29,13 +29,14 @@ export async function chatWithHealthu(message: string, history: { role: 'user' |
       }))
     });
 
-    const result = await chat.sendMessage({
-      message: message
-    });
-
-    return result.text;
+    const result = await chat.sendMessage(message);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error("Healthu Error:", error);
+    if (error instanceof Error && error.message.includes('fetch')) {
+      throw new Error("Network error. Please check your connection or wait a moment.");
+    }
     throw new Error("I'm having trouble connecting right now. Please try again later.");
   }
 }
