@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile for patients and doctors",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["patient", "doctor"] },
+        "age": { "type": "string" },
+        "gender": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "address": { "type": "string" },
+        "degree": { "type": "string" },
+        "sharingEnabled": { "type": "boolean" },
+        "onboarded": { "type": "boolean" }
+      },
+      "required": ["uid", "role", "email"]
+    },
+    "Record": {
+      "title": "Medical Record",
+      "description": "Medical record uploaded by a patient",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "fileURL": { "type": "string" },
+        "fileName": { "type": "string" },
+        "type": { "type": "string", "enum": ["prescription", "report"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientId", "fileURL", "type", "createdAt"]
+    },
+    "Reminder": {
+      "title": "Health Reminder",
+      "description": "Daily health reminders or medicine alerts for patients",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "text": { "type": "string" },
+        "time": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientId", "text", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User collection storing profiles"
+    },
+    "/records/{recordId}": {
+      "schema": "Record",
+      "description": "Collection of medical records"
+    },
+    "/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "Collection of patient health reminders"
+    }
+  }
+}

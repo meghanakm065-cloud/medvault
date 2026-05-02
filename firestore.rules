@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isPatientSharing(patientId) {
+      return get(/databases/$(database)/documents/users/$(patientId)).data.sharingEnabled == true;
+    }
+
+    function isDoctor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
+    // User Profile Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'role']) &&
+               data.uid == request.auth.uid &&
+               data.email is string &&
+               data.role in ['patient', 'doctor'];
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false; // Profiles are not listable for privacy
+
+      allow create: if isSignedIn() && isValidId(userId) && isValidUser(request.resource.data);
+      
+      allow update: if isOwner(userId) && 
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['name', 'age', 'gender', 'bloodGroup', 'address', 'degree', 'sharingEnabled', 'onboarded']);
+    }
+
+    // Medical Record Rules
+    match /records/{recordId} {
+      function isValidRecord(data) {
+        return data.keys().hasAll(['patientId', 'fileURL', 'type', 'createdAt']) &&
+               data.patientId == request.auth.uid &&
+               data.type in ['prescription', 'report'] &&
+               data.fileURL is string &&
+               data.fileURL.size() < 1024;
+      }
+
+      // Read: Patient owner OR Doctor if sharing is enabled
+      allow get: if isSignedIn() && (isOwner(resource.data.patientId) || (isDoctor() && isPatientSharing(resource.data.patientId)));
+      allow list: if isSignedIn() && (isOwner(request.query.limit(100).filters[0].value) || (isDoctor() && isPatientSharing(request.query.limit(100).filters[0].value)));
+      
+      // Specifically for the common queries:
+      allow list: if isSignedIn() && (
+        (request.query.limit <= 100 && resource.data.patientId == request.auth.uid) ||
+        (isDoctor() && isPatientSharing(resource.data.patientId))
+      );
+
+      allow create: if isSignedIn() && isValidRecord(request.resource.data);
+      allow delete: if isOwner(resource.data.patientId);
+    }
+
+    // Health Reminder Rules
+    match /reminders/{reminderId} {
+      function isValidReminder(data) {
+        return data.keys().hasAll(['patientId', 'text', 'completed']) &&
+               data.patientId == request.auth.uid &&
+               data.text is string && data.text.size() <= 500;
+      }
+
+      allow read: if isSignedIn() && isOwner(resource.data.patientId);
+      allow create: if isSignedIn() && isValidReminder(request.resource.data);
+      allow update: if isOwner(resource.data.patientId) && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'time', 'completed']);
+      allow delete: if isOwner(resource.data.patientId);
+    }
+  }
+}
